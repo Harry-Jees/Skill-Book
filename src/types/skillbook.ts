@@ -16,6 +16,7 @@ export interface SkillBook {
   description: string;
   icon: string;
   color: string;
+  category: string;
   tutorials: TutorialStep[];
 }
 
