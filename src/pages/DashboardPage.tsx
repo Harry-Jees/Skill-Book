@@ -52,7 +52,7 @@ const DashboardPage = () => {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground font-body hidden sm:inline">
-              Hello, {user?.name}
+              Hello, {user?.displayName}
             </span>
             <Button variant="ghost" size="sm" onClick={() => navigate("/history")} className="gap-2 font-body">
               <History className="w-4 h-4" />
