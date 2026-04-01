@@ -4,22 +4,36 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const LoginPage = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const { login, signup } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || !password) return;
+    setSubmitting(true);
+
     const displayName = name || email.split("@")[0];
-    if (isSignup) signup(email, displayName);
-    else login(email, displayName);
-    navigate("/dashboard");
+    const error = isSignup
+      ? await signup(email, password, displayName)
+      : await login(email, password);
+
+    setSubmitting(false);
+
+    if (error) {
+      toast({ title: "Error", description: error, variant: "destructive" });
+    } else {
+      navigate("/dashboard");
+    }
   };
 
   return (
@@ -63,8 +77,25 @@ const LoginPage = () => {
                 className="font-body"
               />
             </div>
-            <Button type="submit" className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 font-body font-medium shadow-gold transition-all">
-              {isSignup ? "Create Account" : "Sign In"}
+            <div className="space-y-2">
+              <Label htmlFor="password" className="font-body text-sm font-medium">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="font-body"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90 font-body font-medium shadow-gold transition-all"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : isSignup ? "Create Account" : "Sign In"}
             </Button>
           </form>
 
