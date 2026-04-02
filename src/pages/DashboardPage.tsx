@@ -1,20 +1,80 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { skillBooks, categories } from "@/data/skillbooks";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, History, LogOut, CheckCircle2, Search, X, Sparkles } from "lucide-react";
+import { BookOpen, History, LogOut, CheckCircle2, Search, X, Sparkles, Shield, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import StarDisplay from "@/components/StarDisplay";
+
+interface AIDraft {
+  id: string;
+  skill_name: string;
+  description: string;
+  icon: string;
+  color: string;
+  category: string;
+  tutorials: any[];
+  status: string;
+}
 
 const DashboardPage = () => {
-  const { user, logout, getSkillProgress, isSkillCompleted } = useAuth();
+  const { user, logout, getSkillProgress, isSkillCompleted, isAdmin, stars } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [publishedAI, setPublishedAI] = useState<AIDraft[]>([]);
+  const [skillTests, setSkillTests] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const fetchPublished = async () => {
+      const { data } = await supabase
+        .from("ai_skillbooks")
+        .select("*")
+        .eq("status", "published");
+      setPublishedAI((data as AIDraft[]) || []);
+    };
+    const fetchTests = async () => {
+      const { data } = await supabase.from("skill_tests").select("skill_id");
+      if (data) {
+        const map: Record<string, boolean> = {};
+        data.forEach((t: any) => { map[t.skill_id] = true; });
+        setSkillTests(map);
+      }
+    };
+    fetchPublished();
+    fetchTests();
+  }, []);
+
+  // Merge static + AI-published courses
+  const allBooks = useMemo(() => {
+    const aiAsSkillBooks = publishedAI.map(ai => ({
+      id: `ai-${ai.id}`,
+      skill_name: ai.skill_name,
+      description: ai.description,
+      icon: ai.icon,
+      color: ai.color,
+      category: ai.category,
+      tutorials: (ai.tutorials || []).map((t: any) => ({
+        step_title: t.step_title || "",
+        text: t.text || "",
+        youtube_links: t.youtube_links || [],
+        wiki_links: t.wiki_links || [],
+      })),
+    }));
+    return [...skillBooks, ...aiAsSkillBooks];
+  }, [publishedAI]);
+
+  const allCategories = useMemo(() => {
+    const cats = new Set(categories);
+    allBooks.forEach(b => cats.add(b.category));
+    return Array.from(cats);
+  }, [allBooks]);
 
   const filteredBooks = useMemo(() => {
-    let books = skillBooks;
+    let books = allBooks;
     if (activeCategory) books = books.filter(b => b.category === activeCategory);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -25,23 +85,22 @@ const DashboardPage = () => {
       );
     }
     return books;
-  }, [search, activeCategory]);
+  }, [search, activeCategory, allBooks]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     const searchFiltered = search.trim()
-      ? skillBooks.filter(b => {
+      ? allBooks.filter(b => {
           const q = search.toLowerCase();
           return b.skill_name.toLowerCase().includes(q) || b.description.toLowerCase().includes(q) || b.category.toLowerCase().includes(q);
         })
-      : skillBooks;
+      : allBooks;
     searchFiltered.forEach(b => { counts[b.category] = (counts[b.category] || 0) + 1; });
     return counts;
-  }, [search]);
+  }, [search, allBooks]);
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -50,10 +109,22 @@ const DashboardPage = () => {
             </div>
             <h1 className="text-xl font-display font-bold">Skill Book</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <StarDisplay
+              totalStars={stars.total_stars}
+              courseStars={stars.course_stars}
+              testStars={stars.test_stars}
+              streakStars={stars.streak_stars}
+              currentStreak={stars.current_streak}
+            />
             <span className="text-sm text-muted-foreground font-body hidden sm:inline">
-              Hello, {user?.displayName}
+              {user?.displayName}
             </span>
+            {isAdmin && (
+              <Button variant="ghost" size="sm" onClick={() => navigate("/admin")} className="gap-1.5 font-body text-secondary">
+                <Shield className="w-4 h-4" /> <span className="hidden sm:inline">Admin</span>
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => navigate("/history")} className="gap-2 font-body">
               <History className="w-4 h-4" />
               <span className="hidden sm:inline">History</span>
@@ -66,24 +137,17 @@ const DashboardPage = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Hero */}
         <div className="mb-8 animate-fade-in">
           <h2 className="text-3xl sm:text-4xl font-display font-bold mb-2">
             Your Library
             <Sparkles className="inline-block w-6 h-6 text-secondary ml-2 -mt-1" />
           </h2>
-          <p className="text-muted-foreground font-body">{skillBooks.length} courses to master</p>
+          <p className="text-muted-foreground font-body">{allBooks.length} courses to master</p>
         </div>
 
-        {/* Search */}
         <div className="relative mb-6 max-w-md animate-fade-in" style={{ animationDelay: "0.1s" }}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search courses..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-10 pr-10 font-body"
-          />
+          <Input placeholder="Search courses..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-10 font-body" />
           {search && (
             <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
               <X className="w-4 h-4" />
@@ -91,19 +155,16 @@ const DashboardPage = () => {
           )}
         </div>
 
-        {/* Categories */}
         <div className="flex flex-wrap gap-2 mb-8 animate-fade-in" style={{ animationDelay: "0.15s" }}>
           <button
             onClick={() => setActiveCategory(null)}
             className={`px-3 py-1.5 rounded-full text-xs font-body font-medium transition-all duration-200 ${
-              !activeCategory
-                ? "bg-secondary text-secondary-foreground shadow-gold"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
+              !activeCategory ? "bg-secondary text-secondary-foreground shadow-gold" : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
-            All ({search.trim() ? filteredBooks.length : skillBooks.length})
+            All ({search.trim() ? filteredBooks.length : allBooks.length})
           </button>
-          {categories.map(cat => {
+          {allCategories.map(cat => {
             const count = categoryCounts[cat] || 0;
             if (count === 0 && search.trim()) return null;
             return (
@@ -111,9 +172,7 @@ const DashboardPage = () => {
                 key={cat}
                 onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
                 className={`px-3 py-1.5 rounded-full text-xs font-body font-medium transition-all duration-200 ${
-                  activeCategory === cat
-                    ? "bg-secondary text-secondary-foreground shadow-gold"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  activeCategory === cat ? "bg-secondary text-secondary-foreground shadow-gold" : "bg-muted text-muted-foreground hover:bg-muted/80"
                 }`}
               >
                 {cat} ({count})
@@ -122,7 +181,6 @@ const DashboardPage = () => {
           })}
         </div>
 
-        {/* Grid */}
         {filteredBooks.length === 0 ? (
           <div className="text-center py-20 animate-fade-in">
             <p className="text-4xl mb-4">🔍</p>
@@ -134,6 +192,7 @@ const DashboardPage = () => {
             {filteredBooks.map((book, index) => {
               const progressVal = getSkillProgress(book.id, book.tutorials.length);
               const completed = isSkillCompleted(book.id, book.tutorials.length);
+              const hasTest = skillTests[book.id];
 
               return (
                 <button
@@ -144,7 +203,10 @@ const DashboardPage = () => {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <span className="text-3xl group-hover:scale-110 transition-transform duration-300" role="img">{book.icon}</span>
-                    {completed && <CheckCircle2 className="w-5 h-5 text-secondary" />}
+                    <div className="flex items-center gap-1">
+                      {hasTest && <ClipboardList className="w-4 h-4 text-muted-foreground" />}
+                      {completed && <CheckCircle2 className="w-5 h-5 text-secondary" />}
+                    </div>
                   </div>
                   <div className="mb-1">
                     <span className="text-[10px] uppercase tracking-wider font-body text-muted-foreground">{book.category}</span>

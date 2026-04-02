@@ -1,18 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { skillBooks } from "@/data/skillbooks";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CheckCircle2, Circle, ExternalLink, PlayCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, ExternalLink, PlayCircle, ChevronDown, ChevronUp, ClipboardList } from "lucide-react";
 
 const SkillBookPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { progress, toggleStep, getSkillProgress } = useAuth();
   const [expandedStep, setExpandedStep] = useState<number | null>(0);
+  const [testCount, setTestCount] = useState(0);
 
   const book = skillBooks.find((b) => b.id === id);
+
+  useEffect(() => {
+    if (!id) return;
+    supabase.from("skill_tests").select("id").eq("skill_id", id).then(({ data }) => {
+      setTestCount(data?.length || 0);
+    });
+  }, [id]);
+
   if (!book) return <div className="p-8 text-center">Skill not found</div>;
 
   const skillProgress = progress[book.id];
@@ -187,6 +197,30 @@ const SkillBookPage = () => {
             );
           })}
         </div>
+
+        {/* Tests Section */}
+        {testCount > 0 && (
+          <div className="mt-8 bg-card rounded-2xl border border-border shadow-card p-6 animate-fade-in">
+            <h3 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-secondary" /> Skill Tests
+            </h3>
+            <p className="text-sm text-muted-foreground font-body mb-4">
+              Test your knowledge with {testCount} quiz{testCount > 1 ? "zes" : ""}. Score 7/10 or higher to earn stars!
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {Array.from({ length: testCount }, (_, i) => (
+                <Button
+                  key={i}
+                  variant="outline"
+                  onClick={() => navigate(`/test/${book.id}/${i + 1}`)}
+                  className="font-body gap-2"
+                >
+                  <ClipboardList className="w-4 h-4" /> Test {i + 1}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
