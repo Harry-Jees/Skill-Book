@@ -12,8 +12,17 @@ const SkillBookPage = () => {
   const navigate = useNavigate();
   const { progress, toggleStep, getSkillProgress } = useAuth();
   const [expandedStep, setExpandedStep] = useState<number | null>(0);
+  const [testCount, setTestCount] = useState(0);
 
   const book = skillBooks.find((b) => b.id === id);
+
+  useEffect(() => {
+    if (!id) return;
+    supabase.from("skill_tests").select("id").eq("skill_id", id).then(({ data }) => {
+      setTestCount(data?.length || 0);
+    });
+  }, [id]);
+
   if (!book) return <div className="p-8 text-center">Skill not found</div>;
 
   const skillProgress = progress[book.id];
