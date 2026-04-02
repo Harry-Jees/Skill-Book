@@ -197,6 +197,30 @@ const SkillBookPage = () => {
             );
           })}
         </div>
+
+        {/* Tests Section */}
+        {testCount > 0 && (
+          <div className="mt-8 bg-card rounded-2xl border border-border shadow-card p-6 animate-fade-in">
+            <h3 className="text-lg font-display font-bold mb-3 flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-secondary" /> Skill Tests
+            </h3>
+            <p className="text-sm text-muted-foreground font-body mb-4">
+              Test your knowledge with {testCount} quiz{testCount > 1 ? "zes" : ""}. Score 7/10 or higher to earn stars!
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {Array.from({ length: testCount }, (_, i) => (
+                <Button
+                  key={i}
+                  variant="outline"
+                  onClick={() => navigate(`/test/${book.id}/${i + 1}`)}
+                  className="font-body gap-2"
+                >
+                  <ClipboardList className="w-4 h-4" /> Test {i + 1}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
