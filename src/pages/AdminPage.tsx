@@ -95,9 +95,9 @@ const AdminPage = () => {
 
   const toggleRole = async (userId: string, role: string, hasRole: boolean) => {
     if (hasRole) {
-      await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role);
+      await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role as any);
     } else {
-      await supabase.from("user_roles").insert({ user_id: userId, role });
+      await supabase.from("user_roles").insert({ user_id: userId, role: role as any });
     }
     toast({ title: hasRole ? "Role removed" : "Role assigned" });
     fetchUsers();
