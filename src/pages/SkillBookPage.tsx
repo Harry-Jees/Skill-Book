@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { skillBooks } from "@/data/skillbooks";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CheckCircle2, Circle, ExternalLink, PlayCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, ExternalLink, PlayCircle, ChevronDown, ChevronUp, ClipboardList } from "lucide-react";
 
 const SkillBookPage = () => {
   const { id } = useParams<{ id: string }>();
