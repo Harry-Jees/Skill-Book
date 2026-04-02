@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_skillbooks: {
+        Row: {
+          category: string
+          color: string
+          created_at: string
+          created_by: string | null
+          description: string
+          icon: string
+          id: string
+          skill_name: string
+          status: string
+          tutorials: Json
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          icon?: string
+          id?: string
+          skill_name: string
+          status?: string
+          tutorials?: Json
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          icon?: string
+          id?: string
+          skill_name?: string
+          status?: string
+          tutorials?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -76,11 +118,152 @@ export type Database = {
           },
         ]
       }
+      skill_tests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          questions: Json
+          skill_id: string
+          test_number: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          questions?: Json
+          skill_id: string
+          test_number?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          questions?: Json
+          skill_id?: string
+          test_number?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      test_results: {
+        Row: {
+          answers: Json
+          completed_at: string
+          id: string
+          passed: boolean
+          score: number
+          skill_id: string
+          test_id: string
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          answers?: Json
+          completed_at?: string
+          id?: string
+          passed?: boolean
+          score?: number
+          skill_id: string
+          test_id: string
+          total_questions?: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json
+          completed_at?: string
+          id?: string
+          passed?: boolean
+          score?: number
+          skill_id?: string
+          test_id?: string
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_results_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "skill_tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_stars: {
+        Row: {
+          course_stars: number
+          current_streak: number
+          id: string
+          last_login_date: string | null
+          longest_streak: number
+          streak_stars: number
+          test_stars: number
+          total_stars: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          course_stars?: number
+          current_streak?: number
+          id?: string
+          last_login_date?: string | null
+          longest_streak?: number
+          streak_stars?: number
+          test_stars?: number
+          total_stars?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          course_stars?: number
+          current_streak?: number
+          id?: string
+          last_login_date?: string | null
+          longest_streak?: number
+          streak_stars?: number
+          test_stars?: number
+          total_stars?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_own_profile: { Args: { profile_id: string }; Returns: boolean }
       is_own_skill_progress: {
         Args: { progress_user_id: string }
@@ -88,7 +271,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -215,6 +398,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
