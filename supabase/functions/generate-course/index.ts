@@ -18,7 +18,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify user is admin
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) throw new Error("Unauthorized");
@@ -33,12 +32,12 @@ serve(async (req) => {
     if (!roleData) throw new Error("Admin access required");
 
     const { topic, chapters = 7 } = await req.json();
-    if (!topic) throw new Error("Topic is required");
+    if (!topic || typeof topic !== "string" || topic.trim().length < 2) throw new Error("Valid topic is required");
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const systemPrompt = `You are a course content creator. Generate a comprehensive skill book course. Return ONLY valid JSON with no markdown formatting.
+    const systemPrompt = `You are a course content creator. Generate a comprehensive skill book course. Return ONLY valid JSON with no markdown formatting, no code fences, no extra text.
 
 The JSON must match this exact structure:
 {
@@ -51,19 +50,20 @@ The JSON must match this exact structure:
     {
       "step_title": "string",
       "text": "string (3-4 paragraphs separated by \\n\\n, detailed educational content)",
-      "youtube_links": ["real YouTube URLs related to this topic - search for popular educational videos"],
+      "youtube_search_queries": ["search query 1 for YouTube", "search query 2"],
       "wiki_links": [{"term": "string", "url": "https://en.wikipedia.org/wiki/..."}]
     }
   ]
 }
 
-Requirements:
+CRITICAL RULES:
 - Generate exactly ${chapters} chapters/tutorials
-- Each chapter should have detailed, educational text (3-4 paragraphs)
-- Include 2-3 real, popular YouTube educational video URLs per chapter
-- Include 2-3 relevant Wikipedia links per chapter
+- Each chapter should have detailed, educational text (3-4 paragraphs minimum)
+- For youtube_search_queries: provide 2-3 YouTube SEARCH QUERIES (not URLs!) that users can search to find relevant educational videos. Example: "python basics tutorial for beginners", "learn python variables and data types"
+- Include 2-3 relevant Wikipedia links per chapter with REAL Wikipedia URLs
 - Content should progress from beginner to advanced
-- Make it practical with hands-on examples`;
+- Make it practical with hands-on examples
+- Do NOT include any YouTube URLs - only search queries`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -102,18 +102,56 @@ Requirements:
     // Strip markdown code fences if present
     content = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     
-    const courseData = JSON.parse(content);
+    let courseData;
+    try {
+      courseData = JSON.parse(content);
+    } catch {
+      throw new Error("AI returned invalid JSON. Please try again.");
+    }
+
+    // Validate structure
+    if (!courseData.skill_name || !courseData.tutorials || !Array.isArray(courseData.tutorials) || courseData.tutorials.length === 0) {
+      throw new Error("AI returned incomplete course data. Please try again.");
+    }
+
+    // Convert youtube_search_queries to youtube_links (as search URLs)
+    const sanitizedTutorials = courseData.tutorials.map((t: any, i: number) => {
+      const queries = t.youtube_search_queries || t.youtube_links || [];
+      const youtubeLinks = queries.map((q: string) => {
+        // If it's already a youtube.com URL, convert to search
+        if (q.includes("youtube.com/watch") || q.includes("youtu.be/")) {
+          return null; // Skip direct URLs (likely hallucinated)
+        }
+        // If it looks like a search query, create a search URL
+        const searchQuery = q.replace(/^https?:\/\/.*/, "").trim();
+        if (searchQuery) {
+          return `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
+        }
+        return null;
+      }).filter(Boolean);
+
+      return {
+        step_title: t.step_title || `Chapter ${i + 1}`,
+        text: t.text || "Content not available.",
+        youtube_links: youtubeLinks.length > 0 ? youtubeLinks : [
+          `https://www.youtube.com/results?search_query=${encodeURIComponent(courseData.skill_name + " " + (t.step_title || "tutorial"))}`
+        ],
+        wiki_links: (t.wiki_links || []).filter((w: any) => 
+          w && w.term && w.url && w.url.startsWith("https://en.wikipedia.org/")
+        ),
+      };
+    });
 
     // Save as draft
     const { data: saved, error: saveError } = await supabase
       .from("ai_skillbooks")
       .insert({
         skill_name: courseData.skill_name,
-        description: courseData.description,
+        description: courseData.description || `A comprehensive course about ${topic}.`,
         icon: courseData.icon || "📘",
         color: courseData.color || "hsl(200, 60%, 50%)",
         category: courseData.category || "Personal Development",
-        tutorials: courseData.tutorials,
+        tutorials: sanitizedTutorials,
         status: "draft",
         created_by: user.id,
       })
