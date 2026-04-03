@@ -1,20 +1,50 @@
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { skillBooks } from "@/data/skillbooks";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Award, Calendar } from "lucide-react";
 
+interface AIDraft {
+  id: string;
+  skill_name: string;
+  description: string;
+  icon: string;
+  tutorials: any[];
+}
+
 const HistoryPage = () => {
   const { progress } = useAuth();
   const navigate = useNavigate();
+  const [publishedAI, setPublishedAI] = useState<AIDraft[]>([]);
+
+  useEffect(() => {
+    supabase.from("ai_skillbooks").select("*").eq("status", "published").then(({ data }) => {
+      setPublishedAI((data as AIDraft[]) || []);
+    });
+  }, []);
+
+  const allBooks = useMemo(() => [
+    ...skillBooks,
+    ...publishedAI.map(ai => ({
+      id: `ai-${ai.id}`,
+      skill_name: ai.skill_name,
+      description: ai.description,
+      icon: ai.icon,
+      color: "",
+      category: "",
+      tutorials: ai.tutorials || [],
+    })),
+  ], [publishedAI]);
 
   const completedEntries = Object.entries(progress)
     .filter(([, p]) => p.completedAt)
     .map(([id, p]) => {
-      const book = skillBooks.find((b) => b.id === id);
+      const book = allBooks.find((b) => b.id === id);
       return book ? { book, completedAt: p.completedAt! } : null;
     })
-    .filter(Boolean) as { book: typeof skillBooks[0]; completedAt: string }[];
+    .filter(Boolean) as { book: typeof allBooks[0]; completedAt: string }[];
 
   return (
     <div className="min-h-screen">
@@ -33,9 +63,7 @@ const HistoryPage = () => {
             <Award className="w-16 h-16 text-muted-foreground/30 mx-auto" />
             <h2 className="text-xl font-display font-semibold text-muted-foreground">No completed skills yet</h2>
             <p className="text-sm text-muted-foreground font-body">Complete all chapters in a skill book to see it here.</p>
-            <Button variant="outline" onClick={() => navigate("/dashboard")} className="font-body mt-4">
-              Browse Skills
-            </Button>
+            <Button variant="outline" onClick={() => navigate("/dashboard")} className="font-body mt-4">Browse Skills</Button>
           </div>
         ) : (
           <div className="space-y-4">
