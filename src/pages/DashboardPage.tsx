@@ -4,7 +4,7 @@ import { skillBooks, categories } from "@/data/skillbooks";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, History, LogOut, CheckCircle2, Search, X, Sparkles, Shield, ClipboardList, Target, Plus, Minus } from "lucide-react";
+import { BookOpen, History, LogOut, CheckCircle2, Search, X, Sparkles, Shield, ClipboardList, Target, Plus, Minus, Trophy, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -178,17 +178,28 @@ const DashboardPage = () => {
               streakStars={stars.streak_stars}
               currentStreak={stars.current_streak}
             />
-            <span className="text-sm text-muted-foreground font-body hidden sm:inline">
+            <button
+              onClick={() => navigate("/profile")}
+              className="text-sm text-muted-foreground font-body hidden sm:inline hover:text-foreground transition-colors cursor-pointer"
+            >
               @{user?.username || user?.displayName}
-            </span>
+            </button>
             {isAdmin && (
               <Button variant="ghost" size="sm" onClick={() => navigate("/admin")} className="gap-1.5 font-body text-secondary">
                 <Shield className="w-4 h-4" /> <span className="hidden sm:inline">Admin</span>
               </Button>
             )}
+            <Button variant="ghost" size="sm" onClick={() => navigate("/leaderboard")} className="gap-2 font-body">
+              <Trophy className="w-4 h-4" />
+              <span className="hidden sm:inline">Leaderboard</span>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/history")} className="gap-2 font-body">
               <History className="w-4 h-4" />
               <span className="hidden sm:inline">History</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/profile")} className="gap-2 font-body">
+              <User className="w-4 h-4" />
+              <span className="hidden sm:inline">Profile</span>
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { logout(); navigate("/"); }} className="gap-2 font-body text-muted-foreground">
               <LogOut className="w-4 h-4" />

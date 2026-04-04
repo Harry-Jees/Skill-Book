@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle2, Circle, ExternalLink, Search, ChevronDown, ChevronUp, ClipboardList, Target, Plus, Minus, AlertTriangle, Trophy } from "lucide-react";
 import ConfettiCelebration from "@/components/ConfettiCelebration";
+import YouTubeThumbnail from "@/components/YouTubeThumbnail";
 
 interface TestResult {
   test_number: number;
@@ -111,7 +112,7 @@ const SkillBookPage = () => {
     }
   }, [courseFullyCompleted, confettiShown]);
 
-  const isYouTubeSearch = (url: string) => url.includes("youtube.com/results");
+  
 
   if (!book) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 animate-fade-in">
@@ -256,18 +257,9 @@ const SkillBookPage = () => {
                           <h4 className="text-sm font-body font-semibold mb-3 flex items-center gap-2 text-foreground/70">
                             <Search className="w-4 h-4" /> Video Resources
                           </h4>
-                          <div className="flex flex-wrap gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {step.youtube_links.map((link, vi) => (
-                              <a
-                                key={vi}
-                                href={link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 text-xs font-body font-medium text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
-                              >
-                                ▶ {isYouTubeSearch(link) ? `Search: ${decodeURIComponent(link.split("search_query=")[1] || "").slice(0, 40)}` : `Video ${vi + 1}`}
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                              <YouTubeThumbnail key={vi} url={link} index={vi} />
                             ))}
                           </div>
                         </div>
