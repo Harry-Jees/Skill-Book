@@ -4,7 +4,7 @@ import { skillBooks, categories } from "@/data/skillbooks";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, History, LogOut, CheckCircle2, Search, X, Sparkles, Shield, ClipboardList, Target, Plus, Minus } from "lucide-react";
+import { BookOpen, History, LogOut, CheckCircle2, Search, X, Sparkles, Shield, ClipboardList, Target, Plus, Minus, Trophy, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
