@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle2, Circle, ExternalLink, Search, ChevronDown, ChevronUp, ClipboardList, Target, Plus, Minus, AlertTriangle, Trophy } from "lucide-react";
 import ConfettiCelebration from "@/components/ConfettiCelebration";
+import YouTubeThumbnail from "@/components/YouTubeThumbnail";
 
 interface TestResult {
   test_number: number;
