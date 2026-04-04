@@ -112,7 +112,7 @@ const SkillBookPage = () => {
     }
   }, [courseFullyCompleted, confettiShown]);
 
-  const isYouTubeSearch = (url: string) => url.includes("youtube.com/results");
+  
 
   if (!book) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 animate-fade-in">
