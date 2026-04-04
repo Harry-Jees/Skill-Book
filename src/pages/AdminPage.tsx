@@ -238,14 +238,28 @@ const AdminPage = () => {
 
             {/* USERS TAB */}
             <TabsContent value="users" className="space-y-4">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input placeholder="Search users..." value={userSearch} onChange={e => setUserSearch(e.target.value)} className="pl-10 font-body" />
+                  <Input placeholder="Search by name, username, or ID..." value={userSearch} onChange={e => setUserSearch(e.target.value)} className="pl-10 font-body" />
+                </div>
+                <div className="flex gap-1">
+                  {(["all", "admin", "active", "inactive"] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setSearchFilter(f)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-body font-medium transition-all ${
+                        searchFilter === f ? "bg-secondary text-secondary-foreground" : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                  ))}
                 </div>
                 <Button variant="outline" size="sm" onClick={fetchUsers} className="font-body gap-2">
                   <RefreshCw className="w-4 h-4" /> Refresh
                 </Button>
+                <span className="text-xs text-muted-foreground font-body">{filteredUsers.length} users</span>
               </div>
 
               {loadingUsers ? (
