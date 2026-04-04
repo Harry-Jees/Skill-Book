@@ -15,6 +15,8 @@ import HistoryPage from "./pages/HistoryPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminPage from "./pages/AdminPage";
 import TestPage from "./pages/TestPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
+import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
