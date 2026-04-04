@@ -50,6 +50,7 @@ const AdminPage = () => {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingDrafts, setLoadingDrafts] = useState(true);
   const [userSearch, setUserSearch] = useState("");
+  const [searchFilter, setSearchFilter] = useState<"all" | "admin" | "active" | "inactive">("all");
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
   const [topic, setTopic] = useState("");
