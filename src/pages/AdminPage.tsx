@@ -188,10 +188,15 @@ const AdminPage = () => {
     setGeneratingTests(null);
   };
 
-  const filteredUsers = users.filter(u =>
-    !userSearch || u.display_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-    u.username?.toLowerCase().includes(userSearch.toLowerCase()) || u.id.includes(userSearch)
-  );
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = !userSearch || u.display_name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      u.username?.toLowerCase().includes(userSearch.toLowerCase()) || u.id.includes(userSearch);
+    if (!matchesSearch) return false;
+    if (searchFilter === "admin") return u.roles.includes("admin");
+    if (searchFilter === "active") return u.stars > 0 || u.completedCourses > 0;
+    if (searchFilter === "inactive") return u.stars === 0 && u.completedCourses === 0;
+    return true;
+  });
 
   const roleIcon = (role: string) => {
     if (role === "admin") return <Crown className="w-3 h-3" />;
