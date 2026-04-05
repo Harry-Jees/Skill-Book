@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Trophy, Star, Flame, BookCheck, Medal } from "lucide-react";
@@ -22,12 +23,13 @@ type SortKey = "stars" | "courses" | "streak";
 
 const LeaderboardPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortKey>("stars");
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       const [{ data: profiles }, { data: stars }, { data: progress }] = await Promise.all([
         supabase.from("profiles").select("id, username, display_name"),
         supabase.from("user_stars").select("*"),
@@ -53,7 +55,7 @@ const LeaderboardPage = () => {
       setUsers(mapped);
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, []);
 
   const sorted = useMemo(() => {
@@ -110,37 +112,45 @@ const LeaderboardPage = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {sorted.map((u, i) => (
-                <div
-                  key={u.user_id}
-                  className={`bg-card rounded-2xl border shadow-card p-5 flex items-center gap-4 animate-fade-in ${
-                    i < 3 ? "border-secondary/40" : "border-border"
-                  }`}
-                  style={{ animationDelay: `${i * 0.03}s` }}
-                >
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-display font-bold text-lg shrink-0">
-                    {i < 3 ? <Medal className={`w-6 h-6 ${getMedalColor(i)}`} /> : <span className="text-muted-foreground">{i + 1}</span>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-semibold truncate">
-                      {u.username ? `@${u.username}` : u.display_name || "Anonymous"}
-                    </p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-body mt-0.5">
-                      <span className="flex items-center gap-1"><Star className="w-3 h-3 text-secondary" /> {u.total_stars}</span>
-                      <span className="flex items-center gap-1"><BookCheck className="w-3 h-3" /> {u.completed_courses} courses</span>
-                      <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> {u.longest_streak}d streak</span>
+              {sorted.map((u, i) => {
+                const isCurrentUser = user?.id === u.user_id;
+                return (
+                  <div
+                    key={u.user_id}
+                    className={`rounded-2xl border shadow-card p-5 flex items-center gap-4 animate-fade-in transition-all ${
+                      isCurrentUser
+                        ? "bg-gradient-to-r from-yellow-500/10 via-amber-400/15 to-yellow-500/10 border-yellow-500/50 ring-2 ring-yellow-400/30 shadow-[0_0_20px_-5px_rgba(234,179,8,0.3)]"
+                        : i < 3 ? "bg-card border-secondary/40" : "bg-card border-border"
+                    }`}
+                    style={{ animationDelay: `${i * 0.03}s` }}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-lg shrink-0 ${
+                      isCurrentUser ? "bg-yellow-500/20" : "bg-muted"
+                    }`}>
+                      {i < 3 ? <Medal className={`w-6 h-6 ${getMedalColor(i)}`} /> : <span className="text-muted-foreground">{i + 1}</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-display font-semibold truncate ${isCurrentUser ? "text-yellow-700 dark:text-yellow-300" : ""}`}>
+                        {u.username ? `@${u.username}` : u.display_name || "Anonymous"}
+                        {isCurrentUser && <span className="ml-2 text-xs font-body text-yellow-600 dark:text-yellow-400">(You)</span>}
+                      </p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground font-body mt-0.5">
+                        <span className="flex items-center gap-1"><Star className="w-3 h-3 text-secondary" /> {u.total_stars}</span>
+                        <span className="flex items-center gap-1"><BookCheck className="w-3 h-3" /> {u.completed_courses} courses</span>
+                        <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> {u.longest_streak}d streak</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-xl font-display font-bold ${isCurrentUser ? "text-yellow-600 dark:text-yellow-400" : "text-secondary"}`}>
+                        {sortBy === "stars" ? u.total_stars : sortBy === "courses" ? u.completed_courses : u.longest_streak}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground font-body uppercase">
+                        {sortBy === "stars" ? "stars" : sortBy === "courses" ? "completed" : "days"}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xl font-display font-bold text-secondary">
-                      {sortBy === "stars" ? u.total_stars : sortBy === "courses" ? u.completed_courses : u.longest_streak}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground font-body uppercase">
-                      {sortBy === "stars" ? "stars" : sortBy === "courses" ? "completed" : "days"}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </main>

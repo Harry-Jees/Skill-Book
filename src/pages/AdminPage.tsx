@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import PageTransition from "@/components/PageTransition";
 import {
   ArrowLeft, Users, BookPlus, ClipboardList, Sparkles, Loader2, Trash2,
-  Shield, ShieldCheck, Crown, Search, RefreshCw, CheckCircle2, ChevronDown, ChevronUp, BarChart3
+  Shield, ShieldCheck, Crown, Search, RefreshCw, CheckCircle2, X, BarChart3, Star, Flame, BookCheck, Calendar
 } from "lucide-react";
 
 interface UserRow {
@@ -22,9 +22,14 @@ interface UserRow {
   created_at: string;
   roles: string[];
   stars: number;
+  currentStreak: number;
+  longestStreak: number;
+  courseStars: number;
+  testStars: number;
+  streakStars: number;
   completedCourses: number;
   progressDetails: { skill_id: string; completed_steps: number[]; completed_at: string | null }[];
-  testResults: { skill_id: string; score: number; passed: boolean; test_number: number }[];
+  testResults: { skill_id: string; score: number; passed: boolean; test_number: number; completed_at: string }[];
 }
 
 interface AIDraft {
@@ -51,15 +56,12 @@ const AdminPage = () => {
   const [loadingDrafts, setLoadingDrafts] = useState(true);
   const [userSearch, setUserSearch] = useState("");
   const [searchFilter, setSearchFilter] = useState<"all" | "admin" | "active" | "inactive">("all");
-  const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
   const [topic, setTopic] = useState("");
   const [chapters, setChapters] = useState(7);
   const [generating, setGenerating] = useState(false);
-
   const [generatingTests, setGeneratingTests] = useState<string | null>(null);
-
-  // All courses for reference
   const [publishedAI, setPublishedAI] = useState<AIDraft[]>([]);
 
   const allCourses = [...skillBooks, ...publishedAI.map(ai => ({
@@ -68,12 +70,14 @@ const AdminPage = () => {
 
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
-    const { data: profiles } = await supabase.from("profiles").select("id, display_name, username, created_at");
-    const { data: roles } = await supabase.from("user_roles").select("user_id, role");
-    const { data: starsData } = await supabase.from("user_stars").select("user_id, total_stars");
-    const { data: progressData } = await supabase.from("skill_progress").select("user_id, skill_id, completed_steps, completed_at");
-    const { data: testData } = await supabase.from("test_results").select("user_id, skill_id, score, passed, test_id");
-    const { data: testsRef } = await supabase.from("skill_tests").select("id, test_number");
+    const [{ data: profiles }, { data: roles }, { data: starsData }, { data: progressData }, { data: testData }, { data: testsRef }] = await Promise.all([
+      supabase.from("profiles").select("id, display_name, username, created_at"),
+      supabase.from("user_roles").select("user_id, role"),
+      supabase.from("user_stars").select("user_id, total_stars, course_stars, test_stars, streak_stars, current_streak, longest_streak"),
+      supabase.from("skill_progress").select("user_id, skill_id, completed_steps, completed_at"),
+      supabase.from("test_results").select("user_id, skill_id, score, passed, test_id, completed_at"),
+      supabase.from("skill_tests").select("id, test_number"),
+    ]);
 
     const testNumberMap: Record<string, number> = {};
     (testsRef || []).forEach((t: any) => { testNumberMap[t.id] = t.test_number; });
@@ -88,6 +92,7 @@ const AdminPage = () => {
         score: t.score,
         passed: t.passed,
         test_number: testNumberMap[t.test_id] || 0,
+        completed_at: t.completed_at,
       }));
 
       return {
@@ -97,6 +102,11 @@ const AdminPage = () => {
         created_at: p.created_at,
         roles: userRoles,
         stars: userStars?.total_stars || 0,
+        courseStars: userStars?.course_stars || 0,
+        testStars: userStars?.test_stars || 0,
+        streakStars: userStars?.streak_stars || 0,
+        currentStreak: userStars?.current_streak || 0,
+        longestStreak: userStars?.longest_streak || 0,
         completedCourses: completed,
         progressDetails: userProgress.map((pr: any) => ({
           skill_id: pr.skill_id,
@@ -122,12 +132,6 @@ const AdminPage = () => {
   useEffect(() => { fetchUsers(); fetchDrafts(); }, [fetchUsers, fetchDrafts]);
 
   const toggleRole = async (userId: string, role: string, hasRole: boolean) => {
-    // Prevent removing admin from the main admin account
-    if (role === "admin") {
-      const targetUser = users.find(u => u.id === userId);
-      // We can't check email directly but we protect via the profile name or other means
-      // The edge function also protects this
-    }
     if (hasRole) {
       await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role as any);
     } else {
@@ -214,9 +218,119 @@ const AdminPage = () => {
     return course?.tutorials?.length || 0;
   };
 
+  // User detail modal
+  const renderUserDetail = () => {
+    if (!selectedUser) return null;
+    const u = selectedUser;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setSelectedUser(null)}>
+        <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto animate-fade-in" onClick={e => e.stopPropagation()}>
+          <div className="p-6 border-b border-border flex items-center justify-between sticky top-0 bg-card rounded-t-2xl z-10">
+            <div>
+              <h2 className="text-xl font-display font-bold">{u.display_name || "Unknown User"}</h2>
+              <p className="text-sm text-muted-foreground font-body">@{u.username || "no username"} • Joined {new Date(u.created_at).toLocaleDateString()}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {u.roles.map(r => (
+                <Badge key={r} variant={r === "admin" ? "default" : "secondary"} className="text-xs gap-1">{roleIcon(r)} {r}</Badge>
+              ))}
+              <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}><X className="w-4 h-4" /></Button>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Stars overview */}
+            <div>
+              <h3 className="text-sm font-body font-semibold text-muted-foreground uppercase tracking-wider mb-3">Stars Breakdown</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Total", value: u.stars, icon: Star, color: "text-secondary" },
+                  { label: "Courses", value: u.courseStars, icon: BookCheck, color: "text-blue-500" },
+                  { label: "Tests", value: u.testStars, icon: ClipboardList, color: "text-green-500" },
+                  { label: "Streaks", value: u.streakStars, icon: Flame, color: "text-orange-500" },
+                ].map(({ label, value, icon: Icon, color }) => (
+                  <div key={label} className="bg-muted/30 rounded-xl p-3 text-center">
+                    <Icon className={`w-5 h-5 mx-auto mb-1 ${color}`} />
+                    <p className="text-lg font-display font-bold">{value}</p>
+                    <p className="text-[10px] text-muted-foreground font-body">{label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-4 mt-3 text-xs font-body text-muted-foreground">
+                <span className="flex items-center gap-1"><Flame className="w-3 h-3 text-orange-500" /> Current streak: {u.currentStreak}d</span>
+                <span>Longest: {u.longestStreak}d</span>
+              </div>
+            </div>
+
+            {/* Course Progress */}
+            <div>
+              <h3 className="text-sm font-body font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Course Progress ({u.completedCourses} completed)
+              </h3>
+              {u.progressDetails.length === 0 ? (
+                <p className="text-sm text-muted-foreground font-body">No course progress yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {u.progressDetails.map(pd => {
+                    const totalChapters = getCourseChapterCount(pd.skill_id);
+                    const pct = totalChapters > 0 ? Math.round((pd.completed_steps.length / totalChapters) * 100) : 0;
+                    return (
+                      <div key={pd.skill_id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-body font-medium truncate">{getCourseName(pd.skill_id)}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Progress value={pct} className="h-1.5 flex-1" />
+                            <span className="text-xs font-body text-muted-foreground">{pd.completed_steps.length}/{totalChapters}</span>
+                          </div>
+                        </div>
+                        {pd.completed_at && <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Test Results */}
+            <div>
+              <h3 className="text-sm font-body font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Test Results ({u.testResults.length} taken)
+              </h3>
+              {u.testResults.length === 0 ? (
+                <p className="text-sm text-muted-foreground font-body">No tests taken yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {u.testResults.map((tr, i) => (
+                    <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${tr.passed ? "bg-secondary/5" : "bg-destructive/5"}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                        tr.passed ? "bg-secondary/20 text-secondary" : "bg-destructive/20 text-destructive"
+                      }`}>
+                        {tr.score}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-body font-medium truncate">{getCourseName(tr.skill_id)}</p>
+                        <p className="text-xs text-muted-foreground font-body">Test {tr.test_number} • {tr.passed ? "Passed" : "Failed"}</p>
+                      </div>
+                      <div className="text-xs text-muted-foreground font-body flex items-center gap-1 shrink-0">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(tr.completed_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <PageTransition>
       <div className="min-h-screen">
+        {renderUserDetail()}
+
         <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="gap-2 font-body">
@@ -229,8 +343,7 @@ const AdminPage = () => {
         <main className="max-w-6xl mx-auto px-4 py-8">
           <Tabs defaultValue="users">
             <TabsList className="mb-6 flex-wrap">
-              <TabsTrigger value="users" className="gap-2 font-body"><Users className="w-4 h-4" /> Users</TabsTrigger>
-              <TabsTrigger value="progress" className="gap-2 font-body"><BarChart3 className="w-4 h-4" /> Progress</TabsTrigger>
+              <TabsTrigger value="users" className="gap-2 font-body"><Users className="w-4 h-4" /> Users ({users.length})</TabsTrigger>
               <TabsTrigger value="ai-courses" className="gap-2 font-body"><Sparkles className="w-4 h-4" /> AI Courses</TabsTrigger>
               <TabsTrigger value="drafts" className="gap-2 font-body"><BookPlus className="w-4 h-4" /> Drafts</TabsTrigger>
               <TabsTrigger value="tests" className="gap-2 font-body"><ClipboardList className="w-4 h-4" /> Tests</TabsTrigger>
@@ -275,13 +388,18 @@ const AdminPage = () => {
                           <th className="text-left p-4 font-medium">Roles</th>
                           <th className="text-center p-4 font-medium">⭐</th>
                           <th className="text-center p-4 font-medium">📚</th>
+                          <th className="text-center p-4 font-medium">🔥</th>
                           <th className="text-left p-4 font-medium">Joined</th>
                           <th className="text-center p-4 font-medium">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredUsers.map(u => (
-                          <tr key={u.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                          <tr
+                            key={u.id}
+                            className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
+                            onClick={() => setSelectedUser(u)}
+                          >
                             <td className="p-4">
                               <p className="font-medium">{u.display_name || "—"}</p>
                               <p className="text-xs text-muted-foreground">{u.id.slice(0, 8)}...</p>
@@ -298,8 +416,9 @@ const AdminPage = () => {
                             </td>
                             <td className="p-4 text-center font-medium">{u.stars}</td>
                             <td className="p-4 text-center">{u.completedCourses}</td>
+                            <td className="p-4 text-center">{u.currentStreak}</td>
                             <td className="p-4 text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
-                            <td className="p-4">
+                            <td className="p-4" onClick={e => e.stopPropagation()}>
                               <div className="flex gap-1 justify-center">
                                 {(["admin", "moderator"] as const).map(role => (
                                   <Button
@@ -323,88 +442,6 @@ const AdminPage = () => {
               )}
             </TabsContent>
 
-            {/* PROGRESS TAB */}
-            <TabsContent value="progress" className="space-y-4">
-              <h2 className="text-lg font-display font-bold flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-secondary" /> Detailed User Progress
-              </h2>
-
-              {loadingUsers ? (
-                <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
-              ) : (
-                <div className="space-y-3">
-                  {users.map(u => {
-                    const isExpanded = expandedUser === u.id;
-                    return (
-                      <div key={u.id} className="bg-card rounded-2xl border border-border shadow-card overflow-hidden">
-                        <button
-                          onClick={() => setExpandedUser(isExpanded ? null : u.id)}
-                          className="w-full p-4 flex items-center gap-4 text-left hover:bg-muted/30 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-display font-semibold">
-                              {u.display_name || "Unknown"} {u.username ? `(@${u.username})` : ""}
-                            </p>
-                            <p className="text-xs text-muted-foreground font-body">
-                              ⭐ {u.stars} stars • {u.completedCourses} courses completed • {u.testResults.length} tests taken
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {u.roles.map(r => (
-                              <Badge key={r} variant={r === "admin" ? "default" : "secondary"} className="text-xs">{r}</Badge>
-                            ))}
-                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </div>
-                        </button>
-
-                        {isExpanded && (
-                          <div className="px-4 pb-4 space-y-4 animate-fade-in">
-                            {u.progressDetails.length === 0 ? (
-                              <p className="text-sm text-muted-foreground font-body py-2">No course progress yet.</p>
-                            ) : (
-                              <div className="space-y-3">
-                                <h4 className="text-sm font-body font-semibold text-muted-foreground uppercase tracking-wider">Chapter Progress</h4>
-                                {u.progressDetails.map(pd => {
-                                  const totalChapters = getCourseChapterCount(pd.skill_id);
-                                  const pct = totalChapters > 0 ? Math.round((pd.completed_steps.length / totalChapters) * 100) : 0;
-                                  return (
-                                    <div key={pd.skill_id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30">
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-body font-medium truncate">{getCourseName(pd.skill_id)}</p>
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <Progress value={pct} className="h-1.5 flex-1" />
-                                          <span className="text-xs font-body text-muted-foreground">{pd.completed_steps.length}/{totalChapters}</span>
-                                        </div>
-                                      </div>
-                                      {pd.completed_at && <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {u.testResults.length > 0 && (
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-body font-semibold text-muted-foreground uppercase tracking-wider">Test Results</h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                  {u.testResults.map((tr, i) => (
-                                    <div key={i} className={`p-2 rounded-lg text-center text-xs font-body ${tr.passed ? "bg-secondary/10" : "bg-destructive/10"}`}>
-                                      <p className="font-medium truncate">{getCourseName(tr.skill_id)}</p>
-                                      <p className="text-muted-foreground">Test {tr.test_number}: {tr.score}/10</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </TabsContent>
-
             {/* AI COURSES TAB */}
             <TabsContent value="ai-courses" className="space-y-6">
               <div className="bg-card rounded-2xl border border-border shadow-card p-6 sm:p-8 space-y-6">
@@ -413,8 +450,7 @@ const AdminPage = () => {
                     <Sparkles className="w-5 h-5 text-secondary" /> AI Course Generator
                   </h2>
                   <p className="text-sm text-muted-foreground font-body mt-1">
-                    Enter a topic and AI will generate a complete skill book with chapters, notes, and references.
-                    YouTube search links (not direct URLs) will be generated to ensure they always work.
+                    Enter a topic and AI will generate a complete skill book with chapters, notes, and YouTube search references.
                   </p>
                 </div>
                 <div className="space-y-4">
